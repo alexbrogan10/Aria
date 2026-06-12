@@ -1,0 +1,101 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'          # Trigger on version tags: v0.1.0, v1.0.0, etc.
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  # ── macOS build ──────────────────────────────────────────────────────────────
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron + Renderer
+        run: npm run build:electron
+
+      - name: Package (Mac — DMG + ZIP, Intel + Apple Silicon)
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: npm run electron:dist:mac
+
+      - name: Upload Mac artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-release
+          path: |
+            release/*.dmg
+            release/*.zip
+          retention-days: 14
+
+  # ── Windows build ─────────────────────────────────────────────────────────────
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron + Renderer
+        run: npm run build:electron
+
+      - name: Package (Windows — NSIS installer + portable)
+        env:
+          CSC_LINK: ${{ secrets.WIN_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: npm run electron:dist:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            release/*.exe
+          retention-days: 14
+
+  # ── GitHub Release ────────────────────────────────────────────────────────────
+  release:
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Mac artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-release
+          path: release/
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          draft: true     # Review before publishing
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
