@@ -1,0 +1,134 @@
+{
+  "name": "aria-notation",
+  "version": "0.1.0",
+  "description": "Professional music notation software",
+  "author": "Your Name <you@example.com>",
+  "license": "MIT",
+  "private": true,
+
+  "main": "electron-dist/main.js",
+
+  "scripts": {
+    "dev": "vite",
+    "build:web": "vite build",
+    "build:electron-renderer": "cross-env BUILD_TARGET=electron vite build",
+    "build:electron-main": "tsc -p tsconfig.electron.json",
+    "build:electron": "npm run build:electron-renderer && npm run build:electron-main",
+
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && NODE_ENV=development electron electron-dist/main.js\"",
+    "electron:pack": "npm run build:electron && electron-builder --dir",
+    "electron:dist": "npm run build:electron && electron-builder",
+    "electron:dist:mac": "npm run build:electron && electron-builder --mac",
+    "electron:dist:win": "npm run build:electron && electron-builder --win",
+    "electron:dist:linux": "npm run build:electron && electron-builder --linux"
+  },
+
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/node": "^20.14.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.4",
+    "wait-on": "^7.2.0"
+  },
+
+  "build": {
+    "appId": "com.yourorg.aria",
+    "productName": "Aria",
+    "copyright": "Copyright © 2025 Your Name",
+
+    "files": [
+      "dist/**/*",
+      "electron-dist/**/*",
+      "public/**/*"
+    ],
+
+    "directories": {
+      "buildResources": "build-assets",
+      "output": "release"
+    },
+
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "build-assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build-assets/entitlements.mac.plist",
+      "entitlementsInherit": "build-assets/entitlements.mac.plist",
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] },
+        { "target": "zip", "arch": ["x64", "arm64"] }
+      ]
+    },
+
+    "dmg": {
+      "title": "Aria ${version}",
+      "background": "build-assets/dmg-background.png",
+      "icon": "build-assets/icon.icns",
+      "iconSize": 80,
+      "contents": [
+        { "x": 190, "y": 170, "type": "file" },
+        { "x": 490, "y": 170, "type": "link", "path": "/Applications" }
+      ]
+    },
+
+    "win": {
+      "icon": "build-assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "publisherName": "Aria",
+      "forceCodeSigning": false,
+      "signingHashAlgorithms": null,
+      "sign": null
+    },
+
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build-assets/icon.ico",
+      "uninstallerIcon": "build-assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+
+    "linux": {
+      "icon": "build-assets/icon.png",
+      "category": "Audio",
+      "target": ["AppImage", "deb", "rpm"]
+    },
+
+    "fileAssociations": [
+      {
+        "ext": "aria.json",
+        "name": "Aria Score",
+        "description": "Aria music notation file",
+        "role": "Editor"
+      },
+      {
+        "ext": "musicxml",
+        "name": "MusicXML",
+        "description": "MusicXML file",
+        "role": "Editor"
+      }
+    ],
+
+    "protocols": [
+      {
+        "name": "Aria",
+        "schemes": ["aria"]
+      }
+    ]
+  }
+}
