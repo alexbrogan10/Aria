@@ -106,22 +106,52 @@ export function StaffRenderer({
   });
 
   // ── Beam groups ──────────────────────────────────────────────────────────────
-  // Key rules:
-  //  • Any consecutive beamable notes with the same stem direction share a group
-  //  • Different flag counts in the same group → partial beams for extras
-  //    (e.g. dotted-eighth + sixteenth: 1 shared beam, 16th gets a partial 2nd beam)
-  //  • A rest or quarter/longer note breaks the group
+  // Rules:
+  //  • Beam within each beat (quarter note in simple meter, dotted quarter in compound)
+  //  • Different flag counts OK — extras get partial beams
+  //  • Rests or quarter+ notes always break the group
   interface BeamGroup { notes:NoteGeom[]; dir:'up'|'down'; maxFlags:number; }
   const beamGroups: BeamGroup[] = [];
   let cur2: BeamGroup|null = null;
 
-  positions.forEach(({el})=>{
-    if(el.type!=='note'){ cur2=null; return; }
-    const g=geomMap.get(el.id)!;
-    if(!g.flags){ cur2=null; return; }
-    if(!cur2 || cur2.dir!==g.dir){ cur2={notes:[],dir:g.dir,maxFlags:0}; beamGroups.push(cur2); }
+  const tsMeasure = measure.timeSignature
+    ?? part.measures[0]?.timeSignature
+    ?? { beats:4, beatType:4 };
+  // Beat group in quarter-note units: 1.0 for simple, 1.5 for compound (6/8, 9/8, 12/8)
+  const isCompound = tsMeasure.beatType === 8 && tsMeasure.beats % 3 === 0;
+  const beatUnit   = isCompound ? 1.5 : 1.0;
+
+  let beatAccum = 0; // running total of beats within current beat slot
+
+  positions.forEach(({el}) => {
+    const elBeats = (BEAT_MAP[el.duration.value] ?? 1) * (el.duration.dots ? 1.5 : 1);
+    const g = el.type === 'note' ? geomMap.get(el.id) : null;
+
+    // Non-beamable: break group, advance beat counter
+    if (!g || !g.flags) {
+      cur2 = null;
+      beatAccum = (beatAccum + elBeats) % beatUnit;
+      return;
+    }
+
+    // Would this note cross a beat boundary?
+    const crossesBeat = beatAccum > 0.001 && (beatAccum + elBeats) > beatUnit + 0.001;
+
+    if (!cur2 || cur2.dir !== g.dir || crossesBeat) {
+      cur2 = { notes: [], dir: g.dir, maxFlags: 0 };
+      beamGroups.push(cur2);
+    }
+
     cur2.notes.push(g);
-    cur2.maxFlags=Math.max(cur2.maxFlags,g.flags);
+    cur2.maxFlags = Math.max(cur2.maxFlags, g.flags);
+
+    beatAccum = (beatAccum + elBeats) % beatUnit;
+
+    // If we exactly filled a beat, close the group
+    if (beatAccum < 0.001) {
+      beatAccum = 0;
+      cur2 = null;
+    }
   });
 
   const inBeam=new Set<string>();
