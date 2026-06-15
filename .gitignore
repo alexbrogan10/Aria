@@ -1,0 +1,10 @@
+node_modules/
+dist/
+electron-dist/
+release/
+*.dmg
+*.exe
+*.zip
+.env
+.DS_Store
+Thumbs.db
